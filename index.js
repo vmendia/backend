@@ -18,6 +18,8 @@ const logFormat = (tokens, req, res) => {
 }
 app.use(logger(logFormat))
 
+app.use(express.static('build'))
+
 
 let persons = [
     { 
