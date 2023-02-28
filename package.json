@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "build:ui": "rm -rf build && cd ../frontend && npm run build && cp -rf build ../backend",
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push",
     "test": "echo 'no test cases implemented'",
     "dev": "nodemon index.js"
   },
