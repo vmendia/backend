@@ -1,3 +1,8 @@
+// read configuration info
+require("dotenv").config()
+
+const Person = require('./models/person')
+
 const express = require('express')
 const logger = require('morgan')
 
@@ -21,32 +26,16 @@ app.use(logger(logFormat))
 app.use(express.static('build'))
 
 
-let persons = [
-    { 
-      "id": 1,
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": 2,
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": 3,
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": 4,
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
-
 app.get('/api/persons', (request, response) => {
+    Person.find({})
+        .then( persons => {
+            response.json(persons) 
+        })
+        .catch(error => { 
+            console.log('error:', error.message)
+            response.status(404).end()
+        })
 
-    response.json(persons)
 })
 
 app.get('/info', (request, response) => {
@@ -60,41 +49,48 @@ app.get('/info', (request, response) => {
 })
 
 app.get('/api/persons/:id', (request, response) => {
-    // console.log(`Received request - ${request.method} ${request.url}`)
 
-    const id = Number(request.params.id)
-    const person = persons.find( p => p.id === id)
-    if (person) {
-        response.json(person)
-    }
-    else {
-       response.status(404).json( {
-        error: `Person with id ${request.params.id} not found` 
-       }) 
-    }
+    const id = request.params.id
+    Person.findById(id)
+        .then (person => {
+            if (person === null) {
+                response.status(404).json( {
+                    result: `Person with id ${id} not found`
+                }) 
+            }
+            else { response.json(person) }
+        })
+        .catch ( error => {
+          response.status(404).json( {
+            error: `error returned getting id ${id}: ${error.message}`
+          }) 
+        }) 
 })
+
 
 app.delete('/api/persons/:id', (request, response) => {
-    // console.log(`Received request - ${request.method} ${request.url}`)
 
-    const id = Number(request.params.id)
-    const person = persons.find( p => p.id === id)
-    if (person) {
-        persons = persons.filter( p => p.id !== id)
-        response.status(200).json({ status: `person with id ${id} deleted !` })
-    }
-    else {
-       response.status(404).json( {
-        error: `Person with id ${request.params.id} not found` 
-       }) 
-    }
+    const id = request.params.id
+    Person.findByIdAndRemove(id)
+        .then (person => {
+            if (person === null) {
+                response.json({result: `Id ${id} not found in DB`})
+            }
+            else {
+                response.json( {result: `Id ${id} removed`, person: person} )
+            }
+        })
+        .catch ( error => {
+          response.status(404).json( {
+            error: `Person with id ${id} not found - error: ${error.message}`
+          }) 
+        }) 
 })
 
-app.put('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const updatedPerson = request.body
 
-    const person = persons.find( p => p.id === id)
+app.put('/api/persons/:id', (request, response) => {
+    
+    const updatedPerson = request.body
 
     if ( (updatedPerson.name === undefined) || (updatedPerson.name.trim().length === 0) ) {
         return response.status(400).json( { error: 'name is required'})
@@ -104,49 +100,71 @@ app.put('/api/persons/:id', (request, response) => {
         return response.status(400).json( { error: 'number is required'})
     } 
 
-    const name = updatedPerson.name.trim().toLowerCase()
+    const id = request.params.id
 
-    if ( persons.find( p => p.name.trim().toLowerCase() === updatedPerson.name && p.id !== id) !== undefined) {
-         return response.status(400).json( { error: 'name must be unique'})
-    } 
+    Person.findById(id)
+        .then (person => {
+            if (person === null) {
+                response.status(404).json( {
+                    result: `Person with id ${id} not found`
+                }) 
+            }
+            else { 
+                person.name = updatedPerson.name
+                person.number = updatedPerson.number
 
-    persons = persons.filter( p => p.id !== id)
-    updatedPerson.id = id
-    persons.push(updatedPerson)
-    response.status(200).json(updatedPerson)
+                person.save()
+                .then(result => {
+                    console.log(`updated ${person.name} ${person.number} to phonebook`)
+                    response.json(person)
+                })
+                .catch(error => {
+                    console.log(`error updating phonebook entry - ${person.name} ${person.number} : error detail - ${error.message}`)
+                    response.status(500)
+                })
+            }
+        })
+        .catch ( error => {
+          response.status(404).json( {
+            error: `error returned getting id ${id}: ${error.message}`
+          }) 
+        }) 
+
+
 
 })
+
 
 app.post('/api/persons', (request, response) => {
     // console.log(`Received request - ${request.method} ${request.url}`)
 
-    const person = request.body
+    const body = request.body
 
-    if ( (person.name === undefined) || (person.name.trim().length === 0) ) {
+    if ( (body.name === undefined) || (body.name.trim().length === 0) ) {
         return response.status(400).json( { error: 'name is required'})
     } 
 
-    if ( (person.number === undefined) || (person.number.trim().length === 0) ) {
+    if ( (body.number === undefined) || (body.number.trim().length === 0) ) {
         return response.status(400).json( { error: 'number is required'})
     } 
 
-    const name = person.name.trim().toLowerCase()
 
-    if ( persons.find( p => p.name.trim().toLowerCase() === name ) !== undefined) {
-         return response.status(400).json( { error: 'name must be unique'})
-    } 
+    const person = new Person({
+        name: body.name,
+        number: body.number     
+    })
 
-
-    do {
-        id = Math.floor(Math.random() * 10000)
-    } while (persons.find( p => p.id === id ) !==  undefined) 
-
-    person.id = id;
-
-    persons.push(person)
-    response.status(200).json(person)
+    person.save()
+        .then(result => {
+            console.log(`added ${body.name} ${body.number} to phonebook`)
+            response.json(person)
+        })
+        .catch(error => {
+            console.log(`error saving phonebook entry - ${body.name} ${body.number} : error detail - ${error.message}`)
+            response.status(500)
+        })
 })
 
-// check environment value first
-const PORT =  process.env.PORT | 3001
+
+const PORT =  process.env.PORT
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
