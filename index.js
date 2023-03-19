@@ -7,6 +7,7 @@ const express = require('express')
 const logger = require('morgan')
 
 const app = express()
+
 app.use(express.json())
 
 logger.token('body', (req,res) => req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body) : '' )
@@ -26,29 +27,28 @@ app.use(logger(logFormat))
 app.use(express.static('build'))
 
 
-app.get('/api/persons', (request, response) => {
+app.get('/api/persons', (request, response, next) => {
     Person.find({})
         .then( persons => {
             response.json(persons) 
         })
-        .catch(error => { 
-            console.log('error:', error.message)
-            response.status(404).end()
-        })
-
+        .catch(error => next(error))
 })
 
-app.get('/info', (request, response) => {
+app.get('/info', (request, response, next) => {
     const timestamp = Date()
-    // console.log(`Received request - ${request.method} ${request.url}`)
 
-    response.send(
-        `Phonebook has info for ${persons.length} people
-        <br/><br/>${timestamp}`
-    )
+    Person.estimatedDocumentCount()
+        .then( (count)  => {
+            response.send(
+                `Phonebook has info for ${count} people
+                <br/><br/>${timestamp}`
+            )
+        })
+        .catch(error => next(error))    
 })
 
-app.get('/api/persons/:id', (request, response) => {
+app.get('/api/persons/:id', (request, response, next) => {
 
     const id = request.params.id
     Person.findById(id)
@@ -60,15 +60,11 @@ app.get('/api/persons/:id', (request, response) => {
             }
             else { response.json(person) }
         })
-        .catch ( error => {
-          response.status(404).json( {
-            error: `error returned getting id ${id}: ${error.message}`
-          }) 
-        }) 
+        .catch ( error => next(error)) 
 })
 
 
-app.delete('/api/persons/:id', (request, response) => {
+app.delete('/api/persons/:id', (request, response, next) => {
 
     const id = request.params.id
     Person.findByIdAndRemove(id)
@@ -80,15 +76,10 @@ app.delete('/api/persons/:id', (request, response) => {
                 response.json( {result: `Id ${id} removed`, person: person} )
             }
         })
-        .catch ( error => {
-          response.status(404).json( {
-            error: `Person with id ${id} not found - error: ${error.message}`
-          }) 
-        }) 
+        .catch ( error => next(error)) 
 })
 
-
-app.put('/api/persons/:id', (request, response) => {
+app.put('/api/persons/:id', (request, response, next) => {
     
     const updatedPerson = request.body
 
@@ -124,20 +115,11 @@ app.put('/api/persons/:id', (request, response) => {
                 })
             }
         })
-        .catch ( error => {
-          response.status(404).json( {
-            error: `error returned getting id ${id}: ${error.message}`
-          }) 
-        }) 
-
-
-
+        .catch ( error => next(error)) 
 })
 
 
-app.post('/api/persons', (request, response) => {
-    // console.log(`Received request - ${request.method} ${request.url}`)
-
+app.post('/api/persons', (request, response, next) => {
     const body = request.body
 
     if ( (body.name === undefined) || (body.name.trim().length === 0) ) {
@@ -159,12 +141,27 @@ app.post('/api/persons', (request, response) => {
             console.log(`added ${body.name} ${body.number} to phonebook`)
             response.json(person)
         })
-        .catch(error => {
-            console.log(`error saving phonebook entry - ${body.name} ${body.number} : error detail - ${error.message}`)
-            response.status(500)
-        })
+        .catch ( error => next(error)) 
 })
 
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+// handler of requests with unknown endpoint
+app.use(unknownEndpoint)
+
+const errorHandler = (error, request, reponse, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformed id'})
+    }
+
+    next(error)
+}
+
+app.use (errorHandler)
 
 const PORT =  process.env.PORT
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
