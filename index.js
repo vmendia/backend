@@ -83,14 +83,6 @@ app.put('/api/persons/:id', (request, response, next) => {
     
     const updatedPerson = request.body
 
-    if ( (updatedPerson.name === undefined) || (updatedPerson.name.trim().length === 0) ) {
-        return response.status(400).json( { error: 'name is required'})
-    } 
-
-    if ( (updatedPerson.number === undefined) || (updatedPerson.number.trim().length === 0) ) {
-        return response.status(400).json( { error: 'number is required'})
-    } 
-
     const id = request.params.id
 
     Person.findById(id)
@@ -109,10 +101,7 @@ app.put('/api/persons/:id', (request, response, next) => {
                     console.log(`updated ${person.name} ${person.number} to phonebook`)
                     response.json(person)
                 })
-                .catch(error => {
-                    console.log(`error updating phonebook entry - ${person.name} ${person.number} : error detail - ${error.message}`)
-                    response.status(500)
-                })
+                .catch(error => next(error))
             }
         })
         .catch ( error => next(error)) 
@@ -151,11 +140,13 @@ const unknownEndpoint = (request, response) => {
 // handler of requests with unknown endpoint
 app.use(unknownEndpoint)
 
-const errorHandler = (error, request, reponse, next) => {
+const errorHandler = (error, request, response, next) => {
     console.error(error.message)
 
     if (error.name === 'CastError') {
         return response.status(400).send({ error: 'malformed id'})
+    } else if (error.name === 'ValidationError') {
+        return response.status(400).json({ error: error.message })
     }
 
     next(error)

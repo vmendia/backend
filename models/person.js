@@ -10,8 +10,22 @@ mongoose.connect(url)
     .catch(error => console.log('error connecting to MongoDB: ', error.message))
 
 phonebookSchema = mongoose.Schema({
-    name: String,
-    number: String
+    name: { 
+        type: String,
+        required: true,
+        minLength: 3
+    },
+    number: {
+        type: String,
+        validate: {
+            validator: (v) => {
+                return ( /\d{2,3}-\d{6,}/.test(v) || /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}$/.test(v) )
+            },
+            message: error => `phone is not a valid phone number! - format [#]##-###### or [(]###[)] ###-####`
+          },
+        required: true,
+        minLength: 8
+    }
 })
 
 phonebookSchema.set('toJSON', {
