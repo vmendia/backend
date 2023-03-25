@@ -8,7 +8,8 @@
     "build:ui": "rm -rf build && cd ../frontend && npm run build && cp -rf build ../backend",
     "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push",
     "test": "echo 'no test cases implemented'",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "lint": "eslint ."
   },
   "author": "Victor Mendia",
   "license": "MIT",
@@ -19,6 +20,7 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "eslint": "^8.36.0",
     "nodemon": "^2.0.20"
   }
 }
